@@ -3,12 +3,13 @@ import math
 from typing import Final
 from typing import List
 
-POP_SIZE : Final = 20 # Kích thước quần thể
+TOTAL_GENERATION = 1000
+POP_SIZE : Final = 50 # Kích thước quần thể
 THETA : Final = 0.5 # Xác suất sinh một bit (r >= theta -> bit 1 otherwise bit 0)
-PRECISION : Final = 6
-CROSS_OVER_PROBABILITY = 0.25
-REMOVE_INDIVIDUAL_CROSSOVER = 0.2
-MUTATION_PROBABILITY = 0.01
+PRECISION : Final = 10
+CROSS_OVER_PROBABILITY = 0.3
+REMOVE_INDIVIDUAL_CROSSOVER = 0.5
+MUTATION_PROBABILITY = 0.02
 
 f = open("config.txt", "r", encoding="utf-8")
 M = 0
@@ -22,6 +23,7 @@ for __ in range(k):
   bits = math.ceil(math.log2((b - a) * (10 ** 4) + 1))
   m_bits.append(bits)
   M += bits
+f.close()
 
 print("Tổng số bit cần dùng để mã hóa là:", M)
 
@@ -36,9 +38,11 @@ def generate_individual():
   return individual
 
 # Khởi tạo quần thể
-population = []
-for __ in range(POP_SIZE):
-  population.append(generate_individual())
+def initalize() -> List[str]:
+  population = []
+  for __ in range(POP_SIZE):
+    population.append(generate_individual())
+  return population
 
 # Đánh giá độ thích nghi của cá thể
 def eval(individual : str):
@@ -70,9 +74,22 @@ def eval(individual : str):
 
 # print(decode("000010000011001000001010111011101"))
 # print(eval("000010000011001000001010111011101"))
+# Bánh xe rudet
+def routtle(q, population : List[str]):
+  def get_individual(r):
+    for i in range(POP_SIZE):
+      if r < q[i]:
+        return population[i]
+    return "0" * M
+
+  new_population = []
+  for __ in range(POP_SIZE):
+    r = random.random()
+    new_population.append(get_individual(r))
+  return new_population
 
 # Lựa chọn các cá thể mới
-def selection():
+def selection(population : List[str]):
   evals = [ eval(individual) for individual in population ]
   p = [0] * POP_SIZE 
   q = [0] * POP_SIZE
@@ -85,14 +102,12 @@ def selection():
     else:
       q[i] = round(q[i - 1] + p[i], PRECISION)
   
-  return F, p, q
+  new_populate = routtle(q, population)
+  return F, max(evals), new_populate
 
-# Bánh xe rudet
-def routtle():
-  pass
 
 # Lai ghép cá thể
-def crossover():
+def crossover(population : List[str]):
   def get_parents():
     _pairs = []
 
@@ -117,6 +132,56 @@ def crossover():
 
     return pairs
       
-  return get_parents()
+  parents = get_parents()
+  for i in range(len(parents)):
+    pos = random.randint(1, M - 1)
+    par1, par2 = population[parents[i][0]], population[parents[i][1]]
+    m11, m12 = par1[0 : pos], par1[pos:]
+    m21, m22 = par2[0 : pos], par2[pos:]
+    new_indi1 = m11 + m22
+    new_indi2 = m21 + m12
+    population[parents[i][0]] = new_indi1
+    population[parents[i][1]] = new_indi2
+  
+  return population
 
 # print(crossover())
+def mutate(population : List[str]):
+  total = M * POP_SIZE
+  
+  for __ in range(total):
+    r = random.random()
+    if r < MUTATION_PROBABILITY:
+      pos = random.randint(1, total)
+      # n_chromo * M + n_bit = pos
+      n_chromo = math.floor(pos / M)
+      n_bit = pos - n_chromo * M
+
+      # Tiến hành mutate
+      tmp_bit = population[n_chromo - 1][n_bit]
+      if tmp_bit == "1":
+        tmp_bit = "0"
+      else:
+        tmp_bit = "1"
+      tmp_string = list(population[n_chromo - 1])
+      tmp_string[n_bit - 1] = tmp_bit
+      population[n_chromo - 1] = ''.join(tmp_string)    
+  
+  return population
+      
+# Thuật toán di truyền
+def genetic_algorithm():
+  best = 0
+  population = initalize()
+
+  for i in range(1, TOTAL_GENERATION + 1):
+    F, gtln, population = selection(population)
+    print("Thế hệ", i, "có tổng độ thích nghi là:", F, "đạt giá trị hàm f lớn nhất là:", gtln)
+    population = crossover(population)
+    population = mutate(population)
+    best = max(best, gtln)
+  
+  return best
+
+best = genetic_algorithm()
+print("Hàm số f đạt giá trị lớn nhất sau cùng là:", best)
